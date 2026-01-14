@@ -1,0 +1,59 @@
+generator client {
+  provider   = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  user_id           Int           @id @default(autoincrement())
+  email             String?       @unique
+  phone             String?       @unique
+  telegram_name     String?
+  telegram_username String?
+  telegram_user_id  String        @unique
+  country           String?
+  city              String?
+  image             String?
+  created_at        DateTime      @default(now())
+  
+  fuels             Fuel[]
+  maintenances      Maintenance[]
+  trips             Trip[]
+}
+
+model Fuel {
+  gas_id     Int      @id @default(autoincrement())
+  user_id    Int
+  liters     Float
+  price      Float
+  station    String   @db.VarChar(255)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
+model Maintenance {
+  maintenance_id Int      @id @default(autoincrement())
+  user_id        Int
+  date           DateTime
+  description    String   @db.Text
+  odometer       Int
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now()) @updatedAt
+
+  user           User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
+model Trip {
+  trip_id          Int      @id @default(autoincrement())
+  telegram_user_id String
+  kilometrs        Float
+  direction        String   @db.Text
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  user             User     @relation(fields: [telegram_user_id], references: [telegram_user_id], onDelete: Cascade)
+}
