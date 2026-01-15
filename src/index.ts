@@ -12,6 +12,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import fuelRoutes from './routes/fuel';
 import tripRoutes from './routes/trip';
+import notionRoutes from './routes/notion';
 import maintenanceRoutes from './routes/maintenance';
 import { authMiddleware } from './middlewares/authMiddleware';
 import path from 'path';
@@ -47,6 +48,7 @@ app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/fuel', authMiddleware, fuelRoutes);
 app.use('/api/trip', authMiddleware, tripRoutes);
 app.use('/api/maintenance', authMiddleware, maintenanceRoutes);
+app.use('/api/notion', notionRoutes);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   logger.error(err.stack);
