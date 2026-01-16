@@ -21,10 +21,12 @@ import categoryRoutes from './routes/category';
 import transactionRoutes from './routes/transaction';
 import weatherRoutes from './routes/weather';
 import monoRoutes from './routes/monoRoutes';
+import statisticsRoutes from './routes/statistic';
 
 import { authMiddleware } from './middlewares/authMiddleware';
 import { AppError } from "./class/AppError";
 import { globalErrorHandler } from "./middlewares/errorMiddleware";
+import {initCronJobs} from "./services/cronService";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -73,12 +75,15 @@ app.use('/api/maintenance', authMiddleware, maintenanceRoutes);
 app.use('/api/finance/account', accountRoutes);
 app.use('/api/finance/category', categoryRoutes);
 app.use('/api/finance/transaction', transactionRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 app.all(/.*s*/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
 app.use(globalErrorHandler);
+
+initCronJobs()
 
 app.listen(PORT, () => {
   logger.info(`Server started on port ${PORT}`);
