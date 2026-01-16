@@ -5,40 +5,39 @@ import { runAllParsers } from '../parsers';
 
 export const initCronJobs = () => {
     cron.schedule('0 8 * * *', async () => {
-        console.log('⛽️ Запуск щоденного парсингу цін на пальне...');
+        console.log('⛽️💰 Запуск щоденного парсингу цін та валют...');
         try {
-            const fuelPrices = await runAllParsers();
+            const data = await runAllParsers();
 
-            const dataToSave: any[] = [];
+            // Збереження пального
+            const fuelToSave: any[] = [];
+            if (data.okko?.prices) {
+                data.okko.prices.forEach((p: any) => fuelToSave.push({ station: 'OKKO', fuel_type: p.fuelType, price: p.price }));
+            }
+            if (data.wog?.prices) {
+                data.wog.prices.forEach((p: any) => fuelToSave.push({ station: 'WOG', fuel_type: p.fuelType, price: p.price }));
+            }
 
-            if (fuelPrices.okko) {
-                fuelPrices.okko.prices.forEach((p: any) => {
-                    dataToSave.push({
-                        station: 'OKKO',
-                        fuel_type: p.fuelType,
-                        price: p.price
+            // Збереження валюти
+            const currencyToSave: any[] = [];
+            if (data.currency?.rates) {
+                data.currency.rates.forEach((r: any) => {
+                    currencyToSave.push({
+                        code: r.code,
+                        rate_buy: r.buy,
+                        rate_sell: r.sell
                     });
                 });
             }
 
-            if (fuelPrices.wog) {
-                fuelPrices.wog.prices.forEach((p: any) => {
-                    dataToSave.push({
-                        station: 'WOG',
-                        fuel_type: p.fuelType,
-                        price: p.price
-                    });
-                });
-            }
+            await Promise.all([
+                fuelToSave.length > 0 ? prisma.fuelPriceHistory.createMany({ data: fuelToSave }) : Promise.resolve(),
+                currencyToSave.length > 0 ? prisma.currencyHistory.createMany({ data: currencyToSave }) : Promise.resolve()
+            ]);
 
-            if (dataToSave.length > 0) {
-                await prisma.fuelPriceHistory.createMany({
-                    data: dataToSave
-                });
-                console.log(`✅ Збережено ${dataToSave.length} записів цін на пальне`);
-            }
+            console.log('✅ Всі дані успішно оновлено');
         } catch (error) {
-            console.error('❌ Помилка при парсингу пального:', error);
+            console.error('❌ Помилка в Cron Job:', error);
         }
     });
 

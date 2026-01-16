@@ -114,3 +114,14 @@ model FuelPriceHistory {
   @@index([station])
   @@index([created_at])
 }
+
+model CurrencyHistory {
+  id         Int      @id @default(autoincrement())
+  code       String
+  rate_buy   Float
+  rate_sell  Float
+  created_at DateTime @default(now())
+
+  @@index([code])
+  @@index([created_at])
+}
