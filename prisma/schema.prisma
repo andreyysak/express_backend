@@ -1,6 +1,5 @@
 generator client {
-  provider   = "prisma-client-js"
-  output = "../src/generated/client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -8,20 +7,23 @@ datasource db {
 }
 
 model User {
-  user_id           Int           @id @default(autoincrement())
-  email             String?       @unique
-  phone             String?       @unique
+  user_id           Int      @id @default(autoincrement())
+  email             String?  @unique
+  phone             String?  @unique
   telegram_name     String?
   telegram_username String?
-  telegram_user_id  String        @unique
+  telegram_user_id  String   @unique
   country           String?
   city              String?
   image             String?
-  created_at        DateTime      @default(now())
-  
-  fuels             Fuel[]
-  maintenances      Maintenance[]
-  trips             Trip[]
+  created_at        DateTime @default(now())
+
+  fuels        Fuel[]
+  maintenances Maintenance[]
+  trips        Trip[]
+  accounts     Account[]
+  categories   Category[]
+  transactions Transaction[]
 }
 
 model Fuel {
@@ -33,7 +35,7 @@ model Fuel {
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
 
-  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }
 
 model Maintenance {
@@ -45,7 +47,7 @@ model Maintenance {
   created_at     DateTime @default(now())
   updated_at     DateTime @default(now()) @updatedAt
 
-  user           User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }
 
 model Trip {
@@ -56,5 +58,41 @@ model Trip {
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
-  user             User     @relation(fields: [telegram_user_id], references: [telegram_user_id], onDelete: Cascade)
+  user User @relation(fields: [telegram_user_id], references: [telegram_user_id], onDelete: Cascade)
+}
+
+model Account {
+  account_id Int      @id @default(autoincrement())
+  user_id    Int
+  name       String
+  currency   String   @default("UAH")
+  balance    Float    @default(0)
+  created_at DateTime @default(now())
+
+  user         User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+model Category {
+  category_id Int    @id @default(autoincrement())
+  user_id     Int
+  name        String
+  type        String
+
+  user         User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+model Transaction {
+  transaction_id Int      @id @default(autoincrement())
+  user_id        Int
+  account_id     Int
+  category_id    Int
+  amount         Float
+  description    String?
+  date           DateTime @default(now())
+
+  user     User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  account  Account  @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [category_id], onDelete: Cascade)
 }
