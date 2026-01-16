@@ -1,95 +1,104 @@
 import { Request, Response } from 'express';
 import { prisma } from '../db';
+import { catchAsync } from '../utils/catchAsync';
+import { AppError } from '../class/AppError';
 
-export const getAllMaintenance = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const data = await prisma.maintenance.findMany({
-      where: { user_id: userId }
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch maintenance' });
-  }
-};
+export const getAllMaintenance = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const data = await prisma.maintenance.findMany({
+    where: { user_id: userId },
+    orderBy: { date: 'desc' }
+  });
+  res.json(data);
+});
 
-export const createMaintenance = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const { date, description, odometer } = req.body;
-    const item = await prisma.maintenance.create({
-      data: { 
-        user_id: userId, 
-        date: new Date(date), 
-        description, 
-        odometer 
-      }
-    });
-    res.status(201).json(item);
-  } catch (error) {
-    res.status(400).json({ error: 'Error creating maintenance' });
-  }
-};
+export const createMaintenance = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const { date, description, odometer } = req.body;
 
-export const updateMaintenance = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const item = await prisma.maintenance.update({
-      where: { 
-        maintenance_id: Number(req.params.id),
-        user_id: userId
-      },
-      data: req.body
-    });
-    res.json(item);
-  } catch (error) {
-    res.status(400).json({ error: 'Update failed or access denied' });
-  }
-};
+  const item = await prisma.maintenance.create({
+    data: {
+      user_id: userId,
+      date: new Date(date),
+      description,
+      odometer
+    }
+  });
+  res.status(201).json(item);
+});
 
-export const deleteMaintenance = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    await prisma.maintenance.delete({ 
-      where: { 
-        maintenance_id: Number(req.params.id),
-        user_id: userId
-      } 
-    });
-    res.status(204).send();
-  } catch (error) {
-    res.status(400).json({ error: 'Delete failed or access denied' });
-  }
-};
+export const updateMaintenance = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const id = Number(req.params.id);
 
-export const getMaintenanceById = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const item = await prisma.maintenance.findFirst({
-      where: { 
-        maintenance_id: Number(req.params.id),
-        user_id: userId
-      }
-    });
-    if (!item) return res.status(404).json({ error: 'Maintenance record not found' });
-    res.json(item);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-};
+  const result = await prisma.maintenance.updateMany({
+    where: {
+      maintenance_id: id,
+      user_id: userId
+    },
+    data: req.body
+  });
 
-export const searchMaintenanceByDescription = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const { keyword } = req.query;
-    const data = await prisma.maintenance.findMany({
-      where: {
-        user_id: userId,
-        description: { contains: String(keyword), mode: 'insensitive' }
-      }
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Search failed' });
+  if (result.count === 0) {
+    throw new AppError('Maintenance record not found or access denied', 404);
   }
-};
+
+  const updatedItem = await prisma.maintenance.findUnique({
+    where: { maintenance_id: id }
+  });
+
+  res.json(updatedItem);
+});
+
+export const deleteMaintenance = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const id = Number(req.params.id);
+
+  const result = await prisma.maintenance.deleteMany({
+    where: {
+      maintenance_id: id,
+      user_id: userId
+    }
+  });
+
+  if (result.count === 0) {
+    throw new AppError('Maintenance record not found or access denied', 404);
+  }
+
+  res.status(204).send();
+});
+
+export const getMaintenanceById = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const id = Number(req.params.id);
+
+  const item = await prisma.maintenance.findFirst({
+    where: {
+      maintenance_id: id,
+      user_id: userId
+    }
+  });
+
+  if (!item) {
+    throw new AppError('Maintenance record not found', 404);
+  }
+
+  res.json(item);
+});
+
+export const searchMaintenanceByDescription = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const { keyword } = req.query;
+
+  if (!keyword) {
+    throw new AppError('Search keyword is required', 400);
+  }
+
+  const data = await prisma.maintenance.findMany({
+    where: {
+      user_id: userId,
+      description: { contains: String(keyword), mode: 'insensitive' }
+    }
+  });
+  res.json(data);
+});
