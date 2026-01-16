@@ -1,22 +1,30 @@
 import axios from 'axios';
 
-export const sendTelegramReport = async (stats: any) => {
+export const sendDashboardToTelegram = async (stats: any) => {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     const message = `
-📊 *Звіт за ${stats.period}*
+🚀 *FINANCE & AUTO DASHBOARD* 🚀
+📅 Період: ${stats.period}
 
-💰 *ФІНАНСИ*
-➖ Витрати: ${stats.finance.totalSpent} грн
-➕ Доходи: ${stats.finance.totalIncome} грн
-📑 Транзакцій: ${stats.finance.count}
+💰 *ФІНАНСОВИЙ ЗВІТ*
+• Витрати: \`${stats.finance.totalSpent} грн\`
+• Доходи: \`${stats.finance.totalIncome} грн\`
+• Savings Rate: \`${stats.finance.savingsRate}\`
+• Прогноз до кінця місяця: \`${stats.finance.forecast} грн\`
 
-🚗 *АВТО*
-⛽️ Заправлено: ${stats.auto.fuelLiters} л
-💸 Витрати на пальне: ${stats.auto.fuelCost} грн
-🛣 Пробіг: ${stats.auto.distance} км
-🏁 Поїздок: ${stats.auto.tripsCount}
+🚗 *АВТО ТА ПОЇЗДКИ*
+• Загальний пробіг: \`${stats.auto.distance} км\`
+• Витрати на пальне: \`${stats.auto.fuelCost} грн\`
+• Ефективність: \`${stats.auto.costPerKm} грн/км\`
+• Частота використання: \`${stats.auto.usageFrequency}\`
+
+📊 *ТОП НАПРЯМКІВ*
+${stats.auto.topDirections.map((d: any) => `📍 ${d.direction}: ${d._sum.kilometrs} км`).join('\n')}
+
+⚠️ *АН ОМАЛІЇ ТА ЗАУВАЖЕННЯ*
+${stats.finance.anomaliesCount > 0 ? `❗ Виявлено ${stats.finance.anomaliesCount} аномальних витрат!` : '✅ Аномалій не виявлено'}
     `;
 
     try {
@@ -25,9 +33,7 @@ export const sendTelegramReport = async (stats: any) => {
             text: message,
             parse_mode: 'Markdown'
         });
-        return { success: true };
     } catch (error) {
         console.error('Telegram Error:', error);
-        return { success: false };
     }
 };

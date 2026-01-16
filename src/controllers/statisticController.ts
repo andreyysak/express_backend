@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from "../db";
+import {sendDashboardToTelegram} from "../services/telegramService";
 
 export const getFullStatistics = async (req: Request, res: Response) => {
     try {
@@ -279,6 +280,36 @@ export const getCarUsageFrequency = async (req: Request, res: Response) => {
         const uniqueDays = new Set(trips.map(t => t.created_at.toDateString()));
         const daysInMonth = new Date(Number(year), Number(month), 0).getDate();
         res.json({ activeDays: uniqueDays.size, usagePercentage: ((uniqueDays.size / daysInMonth) * 100).toFixed(2) + "%" });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const sendTelegramReport = async (req: Request, res: Response) => {
+    try {
+        const { month, year } = req.query;
+        const query = { query: { month, year } } as any;
+
+        const dashboardData = {
+            period: `${month}/${year}`,
+            finance: {
+                totalSpent: 45000,
+                totalIncome: 60000,
+                savingsRate: '25%',
+                forecast: 52000,
+                anomaliesCount: 2
+            },
+            auto: {
+                distance: 1200,
+                fuelCost: 4800,
+                costPerKm: 4.0,
+                usageFrequency: '85%',
+                topDirections: [{ direction: 'Kyiv', _sum: { kilometrs: 450 } }]
+            }
+        };
+
+        await sendDashboardToTelegram(dashboardData);
+        res.json({ message: 'Dashboard sent to Telegram' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
