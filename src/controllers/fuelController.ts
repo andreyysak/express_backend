@@ -1,95 +1,104 @@
 import { Request, Response } from 'express';
 import { prisma } from '../db';
+import { catchAsync } from '../utils/catchAsync';
+import { AppError } from '../class/AppError';
 
-export const getAllFuel = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const data = await prisma.fuel.findMany({
-      where: { user_id: userId }
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch fuel data' });
-  }
-};
+export const getAllFuel = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const data = await prisma.fuel.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: 'desc' }
+  });
+  res.json(data);
+});
 
-export const createFuel = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const { liters, price, station } = req.body;
-    const item = await prisma.fuel.create({
-      data: { 
-        user_id: userId, 
-        liters, 
-        price, 
-        station 
-      }
-    });
-    res.status(201).json(item);
-  } catch (error) {
-    res.status(400).json({ error: 'Error creating fuel record' });
-  }
-};
+export const createFuel = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const { liters, price, station } = req.body;
 
-export const updateFuel = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const item = await prisma.fuel.update({
-      where: { 
-        gas_id: Number(req.params.id),
-        user_id: userId 
-      },
-      data: req.body
-    });
-    res.json(item);
-  } catch (error) {
-    res.status(400).json({ error: 'Update failed or access denied' });
-  }
-};
+  const item = await prisma.fuel.create({
+    data: {
+      user_id: userId,
+      liters,
+      price,
+      station
+    }
+  });
+  res.status(201).json(item);
+});
 
-export const deleteFuel = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    await prisma.fuel.delete({ 
-      where: { 
-        gas_id: Number(req.params.id),
-        user_id: userId 
-      } 
-    });
-    res.status(204).send();
-  } catch (error) {
-    res.status(400).json({ error: 'Delete failed or access denied' });
-  }
-};
+export const updateFuel = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const id = Number(req.params.id);
 
-export const getFuelById = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const item = await prisma.fuel.findFirst({
-      where: { 
-        gas_id: Number(req.params.id),
-        user_id: userId 
-      }
-    });
-    if (!item) return res.status(404).json({ error: 'Record not found' });
-    res.json(item);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-};
+  const result = await prisma.fuel.updateMany({
+    where: {
+      gas_id: id,
+      user_id: userId
+    },
+    data: req.body
+  });
 
-export const searchFuelByStation = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId;
-    const { station } = req.query;
-    const data = await prisma.fuel.findMany({
-      where: {
-        user_id: userId,
-        station: { contains: String(station), mode: 'insensitive' }
-      }
-    });
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Search failed' });
+  if (result.count === 0) {
+    throw new AppError('Fuel record not found or access denied', 404);
   }
-};
+
+  const updatedItem = await prisma.fuel.findUnique({
+    where: { gas_id: id }
+  });
+
+  res.json(updatedItem);
+});
+
+export const deleteFuel = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const id = Number(req.params.id);
+
+  const result = await prisma.fuel.deleteMany({
+    where: {
+      gas_id: id,
+      user_id: userId
+    }
+  });
+
+  if (result.count === 0) {
+    throw new AppError('Fuel record not found or access denied', 404);
+  }
+
+  res.status(204).send();
+});
+
+export const getFuelById = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const id = Number(req.params.id);
+
+  const item = await prisma.fuel.findFirst({
+    where: {
+      gas_id: id,
+      user_id: userId
+    }
+  });
+
+  if (!item) {
+    throw new AppError('Fuel record not found', 404);
+  }
+
+  res.json(item);
+});
+
+export const searchFuelByStation = catchAsync(async (req: Request, res: Response) => {
+  const userId = Number((req as any).user.userId);
+  const { station } = req.query;
+
+  if (!station) {
+    throw new AppError('Station query parameter is required', 400);
+  }
+
+  const data = await prisma.fuel.findMany({
+    where: {
+      user_id: userId,
+      station: { contains: String(station), mode: 'insensitive' }
+    }
+  });
+  res.json(data);
+});
