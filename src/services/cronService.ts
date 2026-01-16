@@ -1,8 +1,47 @@
 import cron from 'node-cron';
 import { prisma } from "../db";
 import { sendDashboardToTelegram } from './telegramService';
+import { runAllParsers } from '../parsers';
 
 export const initCronJobs = () => {
+    cron.schedule('0 8 * * *', async () => {
+        console.log('⛽️ Запуск щоденного парсингу цін на пальне...');
+        try {
+            const fuelPrices = await runAllParsers();
+
+            const dataToSave: any[] = [];
+
+            if (fuelPrices.okko) {
+                fuelPrices.okko.prices.forEach((p: any) => {
+                    dataToSave.push({
+                        station: 'OKKO',
+                        fuel_type: p.fuelType,
+                        price: p.price
+                    });
+                });
+            }
+
+            if (fuelPrices.wog) {
+                fuelPrices.wog.prices.forEach((p: any) => {
+                    dataToSave.push({
+                        station: 'WOG',
+                        fuel_type: p.fuelType,
+                        price: p.price
+                    });
+                });
+            }
+
+            if (dataToSave.length > 0) {
+                await prisma.fuelPriceHistory.createMany({
+                    data: dataToSave
+                });
+                console.log(`✅ Збережено ${dataToSave.length} записів цін на пальне`);
+            }
+        } catch (error) {
+            console.error('❌ Помилка при парсингу пального:', error);
+        }
+    });
+
     cron.schedule('0 9 * * 1', async () => {
         console.log('⏳ Запуск щотижневого звіту...');
 

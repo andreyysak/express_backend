@@ -103,3 +103,14 @@ model Transaction {
   @@index([user_id])
   @@index([account_id])
 }
+
+model FuelPriceHistory {
+  id         Int      @id @default(autoincrement())
+  station    String
+  fuel_type  String
+  price      Float
+  created_at DateTime @default(now())
+
+  @@index([station])
+  @@index([created_at])
+}
