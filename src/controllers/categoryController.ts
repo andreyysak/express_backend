@@ -1,55 +1,63 @@
 import { Request, Response } from 'express';
 import { prisma } from "../db";
+import { catchAsync } from '../utils/catchAsync';
+import { AppError } from '../class/AppError';
 
-export const getCategories = async (req: Request, res: Response) => {
-    try {
-        const userId = Number((req as any).user.userId);
-        const categories = await prisma.category.findMany({
-            where: { user_id: userId },
-            orderBy: { name: 'asc' }
-        });
-        res.json(categories);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch categories' });
-    }
-};
+export const getCategories = catchAsync(async (req: Request, res: Response) => {
+    const userId = Number((req as any).user.userId);
+    const categories = await prisma.category.findMany({
+        where: { user_id: userId },
+        orderBy: { name: 'asc' }
+    });
+    res.json(categories);
+});
 
-export const createCategory = async (req: Request, res: Response) => {
-    try {
-        const userId = Number((req as any).user.userId);
-        const { name, type } = req.body;
+export const getCategory = catchAsync(async (req: Request, res: Response) => {
+    const userId = Number((req as any).user.userId);
+    const { id } = req.params;
 
-        if (!name || !type) {
-            return res.status(400).json({ error: 'Name and type are required' });
+    const category = await prisma.category.findFirst({
+        where: {
+            category_id: Number(id),
+            user_id: userId
         }
+    });
 
-        const category = await prisma.category.create({
-            data: {
-                user_id: userId,
-                name,
-                type // INCOME or EXPENSE
-            }
-        });
-        res.status(201).json(category);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to create category' });
+    if (!category) {
+        throw new AppError('Category not found', 404);
     }
-};
 
-export const deleteCategory = async (req: Request, res: Response) => {
-    try {
-        const userId = Number((req as any).user.userId);
-        const { id } = req.params;
+    res.json(category);
+});
 
-        await prisma.category.delete({
-            where: {
-                category_id: Number(id),
-                user_id: userId
-            }
-        });
+export const createCategory = catchAsync(async (req: Request, res: Response) => {
+    const userId = Number((req as any).user.userId);
+    const { name, type } = req.body;
 
-        res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to delete category' });
+    const category = await prisma.category.create({
+        data: {
+            user_id: userId,
+            name,
+            type
+        }
+    });
+    res.status(201).json(category);
+});
+
+export const deleteCategory = catchAsync(async (req: Request, res: Response) => {
+    const userId = Number((req as any).user.userId);
+    const { id } = req.params;
+
+    const result = await prisma.category.deleteMany({
+        where: {
+            category_id: Number(id),
+            user_id: userId
+        }
+    });
+
+    if (result.count === 0) {
+        throw new AppError('Category not found or you do not have permission', 404);
     }
-};
+
+    res.status(204).send();
+});
