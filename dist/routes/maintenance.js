@@ -34,12 +34,16 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const authMiddleware_1 = require("../middlewares/authMiddleware");
+const validateMiddleware_1 = require("../middlewares/validateMiddleware");
+const validationSchema_1 = require("../schemas/validationSchema");
 const maintenanceController = __importStar(require("../controllers/maintenanceController"));
 const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authMiddleware);
 router.get('/', maintenanceController.getAllMaintenance);
 router.get('/search', maintenanceController.searchMaintenanceByDescription);
 router.get('/:id', maintenanceController.getMaintenanceById);
-router.post('/', maintenanceController.createMaintenance);
-router.put('/:id', maintenanceController.updateMaintenance);
+router.post('/', (0, validateMiddleware_1.validate)(validationSchema_1.maintenanceSchema), maintenanceController.createMaintenance);
+router.patch('/:id', (0, validateMiddleware_1.validate)(validationSchema_1.maintenanceSchema), maintenanceController.updateMaintenance);
 router.delete('/:id', maintenanceController.deleteMaintenance);
 exports.default = router;

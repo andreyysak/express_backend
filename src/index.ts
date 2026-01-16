@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -20,10 +20,11 @@ import accountRoutes from './routes/account';
 import categoryRoutes from './routes/category';
 import transactionRoutes from './routes/transaction';
 import weatherRoutes from './routes/weather';
+import monoRoutes from './routes/monoRoutes';
 
 import { authMiddleware } from './middlewares/authMiddleware';
-import {AppError} from "./class/AppError";
-import {globalErrorHandler} from "./middlewares/errorMiddleware";
+import { AppError } from "./class/AppError";
+import { globalErrorHandler } from "./middlewares/errorMiddleware";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,7 +41,6 @@ const limiter = rateLimit({
   max: 100,
   message: 'Too many requests from this IP, please try again after 15 minutes'
 });
-app.use('/api/', limiter);
 
 app.use(passport.initialize());
 app.use(express.static('public'));
@@ -57,19 +57,24 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+app.use('/api/mono', monoRoutes);
+
 app.use('/api/auth', authRoutes);
+app.use('/api/notion', notionRoutes);
+app.use('/api/weather', weatherRoutes);
+
+app.use('/api/', limiter);
+
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/fuel', authMiddleware, fuelRoutes);
 app.use('/api/trip', authMiddleware, tripRoutes);
 app.use('/api/maintenance', authMiddleware, maintenanceRoutes);
-app.use('/api/notion', notionRoutes);
-app.use('/api/weather', weatherRoutes);
 
 app.use('/api/finance/account', accountRoutes);
 app.use('/api/finance/category', categoryRoutes);
 app.use('/api/finance/transaction', transactionRoutes);
 
-app.all('*', (req: Request, res: Response, next: NextFunction) => {
+app.all(/.*s*/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 

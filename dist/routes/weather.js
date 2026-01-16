@@ -35,15 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
-const validateMiddleware_1 = require("../middlewares/validateMiddleware");
-const validationSchema_1 = require("../schemas/validationSchema");
-const tripController = __importStar(require("../controllers/tripController"));
+const weatherController = __importStar(require("../controllers/weatherController"));
 const router = (0, express_1.Router)();
 router.use(authMiddleware_1.authMiddleware);
-router.get('/', tripController.getAllTrips);
-router.get('/search', tripController.getTripsByDirection);
-router.get('/:id', tripController.getTripById);
-router.post('/', (0, validateMiddleware_1.validate)(validationSchema_1.tripSchema), tripController.createTrip);
-router.patch('/:id', (0, validateMiddleware_1.validate)(validationSchema_1.tripSchema), tripController.updateTrip);
-router.delete('/:id', tripController.deleteTrip);
+router.get('/weather', weatherController.getWeatherForUser);
 exports.default = router;
