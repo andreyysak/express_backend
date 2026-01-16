@@ -1,6 +1,5 @@
 generator client {
-  provider   = "prisma-client-js"
-  output = "../src/generated/client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -18,9 +17,11 @@ model User {
   city              String?
   image             String?
   created_at        DateTime      @default(now())
-  
+  accounts          Account[]
+  categories        Category[]
   fuels             Fuel[]
   maintenances      Maintenance[]
+  transactions      Transaction[]
   trips             Trip[]
 }
 
@@ -32,8 +33,9 @@ model Fuel {
   station    String   @db.VarChar(255)
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
-
   user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
 }
 
 model Maintenance {
@@ -44,8 +46,9 @@ model Maintenance {
   odometer       Int
   created_at     DateTime @default(now())
   updated_at     DateTime @default(now()) @updatedAt
-
   user           User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
 }
 
 model Trip {
@@ -55,6 +58,48 @@ model Trip {
   direction        String   @db.Text
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
-
   user             User     @relation(fields: [telegram_user_id], references: [telegram_user_id], onDelete: Cascade)
+
+  @@index([telegram_user_id])
+}
+
+model Account {
+  account_id      Int           @id @default(autoincrement())
+  mono_account_id String?       @unique
+  user_id         Int
+  name            String
+  currency        String        @default("UAH")
+  balance         Float         @default(0)
+  created_at      DateTime      @default(now())
+  user            User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  transactions    Transaction[]
+
+  @@index([user_id])
+}
+
+model Category {
+  category_id  Int           @id @default(autoincrement())
+  user_id      Int
+  name         String
+  type         String
+  user         User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([user_id])
+}
+
+model Transaction {
+  transaction_id Int      @id @default(autoincrement())
+  user_id        Int
+  account_id     Int
+  category_id    Int
+  amount         Float
+  description    String?  @db.Text
+  date           DateTime @default(now())
+  account        Account  @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  category       Category @relation(fields: [category_id], references: [category_id], onDelete: Cascade)
+  user           User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([account_id])
 }
