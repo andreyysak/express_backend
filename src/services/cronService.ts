@@ -6,9 +6,10 @@ import { getStatements } from './monoService';
 import { getCategoryByMcc } from '../utils/mccMapper';
 import { fetchWeatherReport, generateWeeklyReportData } from '../utils/reportHelpers';
 import logger from '../logger';
+import {formatPowerMessage, getPowerShutdownInfo, hasPowerChanged} from "../parsers/power_outage_schedule";
+import {sendPowerPhoto} from "../utils/powerOutage";
 
 export const initCronJobs = () => {
-    // 1. ЩОДЕННО (08:00) — Паливо, валюти та Погода
     cron.schedule('0 8 * * *', async () => {
         try {
             const data = await runAllParsers();
@@ -26,7 +27,6 @@ export const initCronJobs = () => {
                 currencyToSave.length > 0 ? prisma.currencyHistory.createMany({ data: currencyToSave }) : Promise.resolve()
             ]);
 
-            // Отримуємо звіт для першого юзера (тебе)
             const user = await prisma.user.findFirst({ where: { city: { not: null } } });
             if (user) {
                 const weatherMsg = await fetchWeatherReport(user);
@@ -37,7 +37,6 @@ export const initCronJobs = () => {
         }
     });
 
-    // 2. ЩОГОДИНИ (хвилина 5) — Синхронізація Mono
     cron.schedule('5 * * * *', async () => {
         try {
             const accounts = await prisma.account.findMany({
@@ -80,12 +79,25 @@ export const initCronJobs = () => {
         }
     });
 
-    // 3. ЩОПОНЕДІЛКА (09:00) — Звіт
     cron.schedule('0 9 * * 1', async () => {
         const user = await prisma.user.findFirst();
         if (user) {
             const reportData = await generateWeeklyReportData(user.user_id);
             await sendDashboardToTelegram(reportData);
+        }
+    });
+
+    cron.schedule('*/15 * * * *', async () => {
+        const data = await getPowerShutdownInfo();
+
+        if (data && data.rawInfo && hasPowerChanged(data.rawInfo)) {
+            const formattedMessage = formatPowerMessage(data.rawInfo);
+
+            if (data.imgUrl) {
+                await sendPowerPhoto(data.imgUrl, formattedMessage);
+            } else {
+                await sendTelegramMessage(formattedMessage);
+            }
         }
     });
 };
