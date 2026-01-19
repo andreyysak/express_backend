@@ -37,3 +37,26 @@ ${stats.finance.anomaliesCount > 0 ? `❗ Виявлено ${stats.finance.anoma
         console.error('Telegram Error:', error);
     }
 };
+
+export const sendTelegramMessage = async (text: string) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    if (!token || !chatId) {
+        console.error('❌ Помилка: TELEGRAM_BOT_TOKEN або TELEGRAM_CHAT_ID не знайдено в .env');
+        return;
+    }
+
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
+    try {
+        await axios.post(url, {
+            chat_id: chatId,
+            text: text,
+            parse_mode: 'Markdown',
+        });
+        console.log('✉️ Повідомлення успішно надіслано в Telegram');
+    } catch (error: any) {
+        console.error('❌ Помилка відправки в Telegram:', error.response?.data || error.message);
+    }
+};
