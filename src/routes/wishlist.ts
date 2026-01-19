@@ -4,7 +4,11 @@ import * as wishlistController from '../controllers/wishlistController';
 
 const router = Router();
 
-router.post('/', authMiddleware, wishlistController.addWishItem);
-router.get('/', authMiddleware, wishlistController.getWishList);
+router.use(authMiddleware);
+
+router.post('/', wishlistController.addWishItem);
+router.get('/', wishlistController.getWishList);
+router.patch('/:id', wishlistController.updateWishItem);
+router.delete('/:id', wishlistController.deleteWishItem);
 
 export default router;
