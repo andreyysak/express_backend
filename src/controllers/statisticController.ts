@@ -288,28 +288,49 @@ export const getCarUsageFrequency = async (req: Request, res: Response) => {
 export const sendTelegramReport = async (req: Request, res: Response) => {
     try {
         const { month, year } = req.query;
-        const query = { query: { month, year } } as any;
+        if (!month || !year) return res.status(400).json({ error: 'Month and year are required' });
+
+        const startDate = new Date(Number(year), Number(month) - 1, 1);
+        const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
+
+        const [transactions, fuel, trips, topDirections] = await Promise.all([
+            prisma.transaction.findMany({ where: { date: { gte: startDate, lte: endDate } } }),
+            prisma.fuel.aggregate({ _sum: { price: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
+            prisma.trip.aggregate({ _sum: { kilometrs: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
+            prisma.trip.groupBy({
+                by: ['direction'],
+                _sum: { kilometrs: true },
+                where: { created_at: { gte: startDate, lte: endDate } },
+                orderBy: { _sum: { kilometrs: 'desc' } },
+                take: 3
+            })
+        ]);
+
+        const spent = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const income = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+        const kms = trips._sum.kilometrs || 0;
+        const fuelCost = fuel._sum.price || 0;
 
         const dashboardData = {
             period: `${month}/${year}`,
             finance: {
-                totalSpent: 45000,
-                totalIncome: 60000,
-                savingsRate: '25%',
-                forecast: 52000,
-                anomaliesCount: 2
+                totalSpent: spent.toFixed(2),
+                totalIncome: income.toFixed(2),
+                savingsRate: income > 0 ? ((income - spent) / income * 100).toFixed(2) + '%' : '0%',
+                forecast: 'Розраховується...',
+                anomaliesCount: 0
             },
             auto: {
-                distance: 1200,
-                fuelCost: 4800,
-                costPerKm: 4.0,
-                usageFrequency: '85%',
-                topDirections: [{ direction: 'Kyiv', _sum: { kilometrs: 450 } }]
+                distance: kms,
+                fuelCost: fuelCost,
+                costPerKm: kms > 0 ? (fuelCost / kms).toFixed(2) : 0,
+                usageFrequency: 'За запитом',
+                topDirections: topDirections
             }
         };
 
         await sendDashboardToTelegram(dashboardData);
-        res.json({ message: 'Dashboard sent to Telegram' });
+        res.json({ message: 'Real dashboard data sent to Telegram', data: dashboardData });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
