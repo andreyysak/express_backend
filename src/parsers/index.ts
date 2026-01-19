@@ -1,19 +1,21 @@
+import { parseCurrency } from './currency';
 import { parseOkko } from './okko';
 import { parseWog } from './wog';
-import {parseCurrency} from "./currency";
+import { parseEcoData } from './eco';
 
 export const runAllParsers = async () => {
-    console.log('🔄 Starting all parsers (Fuel & Currency)...');
-
-    const [okkoData, wogData, currencyData] = await Promise.all([
+    const [currency, okko, wog, eco] = await Promise.all([
+        parseCurrency(),
         parseOkko(),
         parseWog(),
-        parseCurrency()
+        parseEcoData()
     ]);
 
     return {
-        okko: okkoData,
-        wog: wogData,
-        currency: currencyData
+        currency,
+        okko,
+        wog,
+        eco,
+        timestamp: new Date()
     };
 };

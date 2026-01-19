@@ -1,22 +1,36 @@
 import { prisma } from "../db";
+import { parseEcoData } from "../parsers/eco";
 
 export const fetchWeatherReport = async (user: any) => {
     try {
         const apiKey = process.env.OPENWEATHER_API_KEY;
-        const { data } = await require('axios').get(`https://api.openweathermap.org/data/2.5/weather`, {
-            params: { q: user.city, appid: apiKey, units: 'metric', lang: 'ua' }
-        });
 
+        const [weatherRes, eco] = await Promise.all([
+            require('axios').get(`https://api.openweathermap.org/data/2.5/weather`, {
+                params: { q: user.city, appid: apiKey, units: 'metric', lang: 'ua' }
+            }),
+            parseEcoData()
+        ]);
+
+        const data = weatherRes.data;
         const t = Math.round(data.main.temp);
+
         let advice = t < 0 ? "❄️ Одягайтеся тепліше, на вулиці мороз." : "🍂 Гарної прогулянки!";
+        if (eco.aqi > 100) advice = "😷 Якість повітря погана, краще побути вдома.";
+
+        const ecoInfo = `🌍 **Екологія (Хмельницький)**\n` +
+            `☁️ Повітря (AQI): ${eco.aqi} (${eco.aqiStatus})\n` +
+            `☢️ Радіація: ${eco.radiation} нЗв/год ${eco.radiation > 200 ? '⚠️' : '✅'}`;
 
         return `☀️ **Погода у м. ${data.name}**\n\n` +
             `🌡 Температура: ${t}°C (відчувається як ${Math.round(data.main.feels_like)}°C)\n` +
             `💨 Вітер: ${data.wind.speed} м/с\n` +
             `☁️ Опис: ${data.weather[0].description}\n\n` +
+            `${ecoInfo}\n\n` +
             `💡 Порада: ${advice}`;
+
     } catch (e) {
-        return `⚠️ Не вдалося отримати погоду для міста ${user.city}`;
+        return `⚠️ Не вдалося отримати повний звіт для міста ${user.city}`;
     }
 };
 
@@ -27,7 +41,7 @@ export const generateWeeklyReportData = async (userId: number) => {
     const [transactions, fuel, trips] = await Promise.all([
         prisma.transaction.findMany({ where: { user_id: userId, date: { gte: startDate } } }),
         prisma.fuel.aggregate({ _sum: { price: true }, where: { user_id: userId, created_at: { gte: startDate } } }),
-        prisma.trip.aggregate({ _sum: { kilometrs: true }, where: { user: { user_id: userId }, created_at: { gte: startDate } } })
+        prisma.trip.aggregate({ _sum: { kilometrs: true }, where: { user: { telegram_user_id: String(userId) }, created_at: { gte: startDate } } })
     ]);
 
     const spent = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
