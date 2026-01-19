@@ -20,7 +20,7 @@ import accountRoutes from './routes/account';
 import categoryRoutes from './routes/category';
 import transactionRoutes from './routes/transaction';
 import weatherRoutes from './routes/weather';
-import monoRoutes from './routes/monoRoutes';
+import monoRoutes from './routes/monobank';
 import statisticsRoutes from './routes/statistic';
 import wishlistRoutes from './routes/wishlist';
 
