@@ -45,37 +45,43 @@ export const initCronJobs = () => {
         console.log('⏳ Запуск щотижневого звіту...');
 
         const now = new Date();
-        const month = now.getMonth() + 1;
-        const year = now.getFullYear();
+        const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7); // Останні 7 днів
+        const endDate = now;
 
         try {
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0, 23, 59, 59);
-
-            const [transactions, fuel, trips] = await Promise.all([
+            const [transactions, fuel, trips, topDirections] = await Promise.all([
                 prisma.transaction.findMany({ where: { date: { gte: startDate, lte: endDate } } }),
-                prisma.fuel.aggregate({ _sum: { price: true, liters: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
-                prisma.trip.aggregate({ _sum: { kilometrs: true }, where: { created_at: { gte: startDate, lte: endDate } } })
+                prisma.fuel.aggregate({ _sum: { price: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
+                prisma.trip.aggregate({ _sum: { kilometrs: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
+                prisma.trip.groupBy({
+                    by: ['direction'],
+                    _sum: { kilometrs: true },
+                    where: { created_at: { gte: startDate, lte: endDate } },
+                    orderBy: { _sum: { kilometrs: 'desc' } },
+                    take: 3
+                })
             ]);
 
             const spent = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
             const income = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+            const kms = trips._sum.kilometrs || 0;
+            const fuelCost = fuel._sum.price || 0;
 
             const dashboardData = {
-                period: `${month}/${year} (Weekly Auto-Report)`,
+                period: `За останній тиждень (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
                 finance: {
                     totalSpent: spent.toFixed(2),
                     totalIncome: income.toFixed(2),
                     savingsRate: income > 0 ? ((income - spent) / income * 100).toFixed(2) + '%' : '0%',
-                    forecast: 'Calculated at end of month',
+                    forecast: 'Наступний звіт через тиждень',
                     anomaliesCount: 0
                 },
                 auto: {
-                    distance: trips._sum.kilometrs || 0,
-                    fuelCost: fuel._sum.price || 0,
-                    costPerKm: (trips._sum.kilometrs || 0) > 0 ? ((fuel._sum.price || 0) / (trips._sum.kilometrs || 0)).toFixed(2) : 0,
-                    usageFrequency: 'Weekly auto-check',
-                    topDirections: []
+                    distance: kms,
+                    fuelCost: fuelCost,
+                    costPerKm: kms > 0 ? (fuelCost / kms).toFixed(2) : 0,
+                    usageFrequency: `${(kms / 7).toFixed(0)} км/день`,
+                    topDirections: topDirections // Тепер тут реальні дані
                 }
             };
 
