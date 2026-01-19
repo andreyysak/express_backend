@@ -1,11 +1,19 @@
 import { Router } from 'express';
-import { getTasks, createTask, deleteTask } from '../controllers/notionController';
+import {
+    getTasks,
+    createTask,
+    updateTask,
+    deleteTask
+} from '../controllers/notionController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 
 const router = Router();
 
-router.get('/', authMiddleware, getTasks);
-router.post('/', authMiddleware, createTask);
-router.delete('/:id', authMiddleware, deleteTask);
+router.use(authMiddleware);
+
+router.get('/', getTasks);
+router.post('/', createTask);
+router.patch('/:id', updateTask);
+router.delete('/:id', deleteTask);
 
 export default router;
