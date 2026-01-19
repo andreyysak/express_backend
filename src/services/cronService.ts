@@ -90,13 +90,18 @@ export const initCronJobs = () => {
     cron.schedule('*/15 * * * *', async () => {
         const data = await getPowerShutdownInfo();
 
-        if (data && data.rawInfo && hasPowerChanged(data.rawInfo)) {
-            const formattedMessage = formatPowerMessage(data.rawInfo);
+        if (data && data.rawInfo) {
+            if (hasPowerChanged(data.rawInfo)) {
+                const formattedMessage = formatPowerMessage(data.rawInfo);
 
-            if (data.imgUrl) {
-                await sendPowerPhoto(data.imgUrl, formattedMessage);
+                if (data.imgUrl) {
+                    await sendPowerPhoto(data.imgUrl, formattedMessage);
+                } else {
+                    await sendTelegramMessage(formattedMessage);
+                }
+                console.log('✅ Графік змінився, повідомлення надіслано.');
             } else {
-                await sendTelegramMessage(formattedMessage);
+                console.log('ℹ️ Графік світла без змін, пропускаємо.');
             }
         }
     });
