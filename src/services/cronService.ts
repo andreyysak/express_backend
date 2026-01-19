@@ -1,139 +1,103 @@
 import cron from 'node-cron';
 import { prisma } from "../db";
-import {sendDashboardToTelegram, sendTelegramMessage} from './telegramService';
+import { sendDashboardToTelegram, sendTelegramMessage } from './telegramService';
 import { runAllParsers } from '../parsers';
-import { getMonoTransactions } from './monoService'; // Імпортуємо твій сервіс
+import { getStatements } from './monoService';
+import { getCategoryByMcc } from '../utils/mccMapper';
+import { fetchWeatherReport, generateWeeklyReportData } from '../utils/reportHelpers';
+import logger from '../logger';
+import {formatPowerMessage, getPowerShutdownInfo, hasPowerChanged} from "../parsers/power_outage_schedule";
+import {sendPowerPhoto} from "../utils/powerOutage";
 
 export const initCronJobs = () => {
     cron.schedule('0 8 * * *', async () => {
-        console.log('⛽️💰 Запуск щоденного парсингу цін та валют...');
         try {
             const data = await runAllParsers();
             const fuelToSave: any[] = [];
-            if (data.okko?.prices) {
-                data.okko.prices.forEach((p: any) => fuelToSave.push({ station: 'OKKO', fuel_type: p.fuelType, price: p.price }));
-            }
-            if (data.wog?.prices) {
-                data.wog.prices.forEach((p: any) => fuelToSave.push({ station: 'WOG', fuel_type: p.fuelType, price: p.price }));
-            }
+            if (data.okko?.prices) data.okko.prices.forEach((p: any) => fuelToSave.push({ station: 'OKKO', fuel_type: p.fuelType, price: p.price }));
+            if (data.wog?.prices) data.wog.prices.forEach((p: any) => fuelToSave.push({ station: 'WOG', fuel_type: p.fuelType, price: p.price }));
 
             const currencyToSave: any[] = [];
-            if (data.currency?.rates) {
-                data.currency.rates.forEach((r: any) => {
-                    currencyToSave.push({ code: r.code, rate_buy: r.buy, rate_sell: r.sell });
-                });
-            }
+            if (data.currency?.rates) data.currency.rates.forEach((r: any) => {
+                currencyToSave.push({ code: r.code, rate_buy: r.buy, rate_sell: r.sell });
+            });
 
             await Promise.all([
                 fuelToSave.length > 0 ? prisma.fuelPriceHistory.createMany({ data: fuelToSave }) : Promise.resolve(),
                 currencyToSave.length > 0 ? prisma.currencyHistory.createMany({ data: currencyToSave }) : Promise.resolve()
             ]);
-            console.log('✅ Всі дані успішно оновлено');
+
+            const user = await prisma.user.findFirst({ where: { city: { not: null } } });
+            if (user) {
+                const weatherMsg = await fetchWeatherReport(user);
+                await sendTelegramMessage(weatherMsg);
+            }
         } catch (error) {
-            console.error('❌ Помилка в Cron Job (Parsers):', error);
+            logger.error('Morning Cron Error:');
         }
     });
 
     cron.schedule('5 * * * *', async () => {
-        console.log('🔄 Синхронізація транзакцій Monobank...');
         try {
-            const accountId = '0';
-            const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+            const accounts = await prisma.account.findMany({
+                where: { mono_account_id: { not: null } }
+            });
 
-            const transactions = await getMonoTransactions(accountId, oneDayAgo);
-            let newTransactionsCount = 0;
+            for (const acc of accounts) {
+                const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+                const transactions = await getStatements(acc.mono_account_id!, oneDayAgo);
 
-            for (const tx of transactions) {
-                const amount = tx.amount / 100;
-                const txDate = new Date(tx.time * 1000);
+                for (const tx of transactions) {
+                    const amount = tx.amount / 100;
+                    const txDate = new Date(tx.time * 1000);
 
-                const exists = await prisma.transaction.findFirst({
-                    where: {
-                        date: txDate,
-                        amount: amount,
-                        description: tx.description
-                    }
-                });
-
-                if (!exists) {
-                    await prisma.transaction.create({
-                        data: {
-                            user_id: 1,
-                            account_id: 1,
-                            category_id: 1,
-                            amount: amount,
-                            description: tx.description,
-                            date: txDate
-                        }
+                    const exists = await prisma.transaction.findFirst({
+                        where: { user_id: acc.user_id, amount, date: txDate, description: tx.description }
                     });
 
-                    newTransactionsCount++;
+                    if (!exists) {
+                        const categoryName = getCategoryByMcc(tx.mcc);
+                        let category = await prisma.category.findFirst({ where: { user_id: acc.user_id, name: categoryName } });
+                        if (!category) {
+                            category = await prisma.category.create({ data: { user_id: acc.user_id, name: categoryName, type: amount < 0 ? 'EXPENSE' : 'INCOME' } });
+                        }
 
-                    const emoji = amount < 0 ? '💸' : '💰';
-                    const message = `${emoji} **Нова транзакція Monobank**\n\n` +
-                        `📝 Опис: \`${tx.description}\`\n` +
-                        `💵 Сума: \`${amount.toFixed(2)} грн\`\n` +
-                        `📅 Дата: \`${txDate.toLocaleString('uk-UA')}\``;
+                        await prisma.$transaction([
+                            prisma.transaction.create({
+                                data: { user_id: acc.user_id, account_id: acc.account_id, category_id: category.category_id, amount, description: tx.description, date: txDate }
+                            }),
+                            prisma.account.update({ where: { account_id: acc.account_id }, data: { balance: { increment: amount } } })
+                        ]);
 
-                    await sendTelegramMessage(message);
+                        const emoji = amount < 0 ? '💸' : '💰';
+                        await sendTelegramMessage(`${emoji} **${acc.name}**: \`${amount.toFixed(2)} ${acc.currency}\`\n📝 \`${tx.description}\``);
+                    }
                 }
             }
-
-            if (newTransactionsCount > 0) {
-                console.log(`✅ Синхронізація завершена. Додано ${newTransactionsCount} нових повідомлень у ТГ.`);
-            }
         } catch (error) {
-            console.error('❌ Помилка в Cron Job (Mono Sync):', error);
+            logger.error('Mono Cron Error:');
         }
     });
 
     cron.schedule('0 9 * * 1', async () => {
-        console.log('⏳ Запуск щотижневого звіту...');
-        const now = new Date();
-        const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-        const endDate = now;
+        const user = await prisma.user.findFirst();
+        if (user) {
+            const reportData = await generateWeeklyReportData(user.user_id);
+            await sendDashboardToTelegram(reportData);
+        }
+    });
 
-        try {
-            const [transactions, fuel, trips, topDirections] = await Promise.all([
-                prisma.transaction.findMany({ where: { date: { gte: startDate, lte: endDate } } }),
-                prisma.fuel.aggregate({ _sum: { price: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
-                prisma.trip.aggregate({ _sum: { kilometrs: true }, where: { created_at: { gte: startDate, lte: endDate } } }),
-                prisma.trip.groupBy({
-                    by: ['direction'],
-                    _sum: { kilometrs: true },
-                    where: { created_at: { gte: startDate, lte: endDate } },
-                    orderBy: { _sum: { kilometrs: 'desc' } },
-                    take: 3
-                })
-            ]);
+    cron.schedule('*/15 * * * *', async () => {
+        const data = await getPowerShutdownInfo();
 
-            const spent = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-            const income = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-            const kms = trips._sum.kilometrs || 0;
-            const fuelCost = fuel._sum.price || 0;
+        if (data && data.rawInfo && hasPowerChanged(data.rawInfo)) {
+            const formattedMessage = formatPowerMessage(data.rawInfo);
 
-            const dashboardData = {
-                period: `За останній тиждень (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`,
-                finance: {
-                    totalSpent: spent.toFixed(2),
-                    totalIncome: income.toFixed(2),
-                    savingsRate: income > 0 ? ((income - spent) / income * 100).toFixed(2) + '%' : '0%',
-                    forecast: 'Наступний звіт через тиждень',
-                    anomaliesCount: 0
-                },
-                auto: {
-                    distance: kms,
-                    fuelCost: fuelCost,
-                    costPerKm: kms > 0 ? (fuelCost / kms).toFixed(2) : 0,
-                    usageFrequency: `${(kms / 7).toFixed(0)} км/день`,
-                    topDirections: topDirections
-                }
-            };
-
-            await sendDashboardToTelegram(dashboardData);
-            console.log('✅ Звіт успішно надіслано в Telegram');
-        } catch (error) {
-            console.error('❌ Помилка в Cron Job (Weekly Report):', error);
+            if (data.imgUrl) {
+                await sendPowerPhoto(data.imgUrl, formattedMessage);
+            } else {
+                await sendTelegramMessage(formattedMessage);
+            }
         }
     });
 };

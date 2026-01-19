@@ -28,15 +28,18 @@ export const getTasks = async (req: Request, res: Response) => {
 
             const { results, has_more, next_cursor } = response.data;
 
-            const mappedTasks = results.map((page: any) => ({
-                id: page.id,
-                title: page.properties.Name.title[0]?.plain_text || 'Без назви',
-                status: page.properties.Status.select?.name || 'Без статусу',
-                project: page.properties.Project.select?.name || 'Без проекту',
-                category: page.properties.Category.select?.name || 'Інше',
-                priority: page.properties.Priority.select?.name || 'Не вказано',
-                link: page.properties.Link.url,
-            }));
+            const mappedTasks = results.map((page: any) => {
+                const p = page.properties;
+                return {
+                    id: page.id,
+                    title: p.Name?.title?.[0]?.plain_text || 'Без назви',
+                    status: p.Status?.status?.name || p.Status?.select?.name || 'Без статусу',
+                    project: p.Project?.select?.name || 'Без проекту',
+                    category: p.Category?.select?.name || 'Інше',
+                    priority: p.Priority?.select?.name || 'Не вказано',
+                    link: p.Link?.url || null,
+                };
+            });
 
             tasks = [...tasks, ...mappedTasks];
             hasMore = has_more;
@@ -45,26 +48,81 @@ export const getTasks = async (req: Request, res: Response) => {
 
         res.json(tasks);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        if (error.response) {
+            console.error('NOTION ERROR DATA:', JSON.stringify(error.response.data, null, 2));
+        }
+        res.status(400).json({
+            error: error.message,
+            details: error.response?.data?.message || 'Check terminal'
+        });
     }
 };
 
 export const createTask = async (req: Request, res: Response) => {
     try {
         const task = req.body;
+        const properties: any = {
+            Name: { title: [{ text: { content: task.title || 'Нова задача' } }] }
+        };
+
+        if (task.status) properties.Status = { select: { name: task.status } };
+        if (task.project) properties.Project = { select: { name: task.project } };
+        if (task.category) properties.Category = { select: { name: task.category } };
+        if (task.priority) properties.Priority = { select: { name: task.priority } };
+        if (task.link) properties.Link = { url: task.link };
+
         const response = await notionApi.post('/pages', {
             parent: { database_id: DATABASE_ID },
-            properties: {
-                Name: { title: [{ text: { content: task.title } }] },
-                Status: { select: { name: task.status } },
-                Project: { select: { name: task.project } },
-                Category: { select: { name: task.category } },
-                Priority: { select: { name: task.priority } },
-            },
+            properties
         });
-        res.json({ ...task, id: response.data.id });
+
+        res.json({ id: response.data.id, ...task });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        if (error.response) {
+            console.error('NOTION CREATE ERROR:', JSON.stringify(error.response.data, null, 2));
+        }
+        res.status(400).json({ error: error.message, details: error.response?.data?.message });
+    }
+};
+
+export const updateTask = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const task = req.body;
+        const properties: any = {};
+
+        if (task.title) {
+            properties.Name = { title: [{ text: { content: task.title } }] };
+        }
+        if (task.status) {
+            properties.Status = { select: { name: task.status } };
+        }
+        if (task.project) {
+            properties.Project = { select: { name: task.project } };
+        }
+        if (task.category) {
+            properties.Category = { select: { name: task.category } };
+        }
+        if (task.priority) {
+            properties.Priority = { select: { name: task.priority } };
+        }
+        if (task.link) {
+            properties.Link = { url: task.link };
+        }
+
+        const response = await notionApi.patch(`/pages/${id}`, {
+            properties
+        });
+
+        res.json({ success: true, id: response.data.id, updatedFields: task });
+    } catch (error: any) {
+        if (error.response) {
+            console.error('NOTION UPDATE ERROR:', JSON.stringify(error.response.data, null, 2));
+        }
+        res.status(400).json({
+            error: error.message,
+            details: error.response?.data?.message || 'Check terminal'
+        });
     }
 };
 

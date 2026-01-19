@@ -23,6 +23,7 @@ model User {
   maintenances      Maintenance[]
   transactions      Transaction[]
   trips             Trip[]
+  wishList          WishList[]
 }
 
 model Fuel {
@@ -124,4 +125,17 @@ model CurrencyHistory {
 
   @@index([code])
   @@index([created_at])
+}
+
+model WishList {
+  wish_id    Int      @id @default(autoincrement())
+  user_id    Int
+  url        String
+  title      String?
+  price      Float?
+  image_url  String?
+  category   String   @default("General")
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }

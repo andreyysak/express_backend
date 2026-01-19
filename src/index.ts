@@ -20,8 +20,9 @@ import accountRoutes from './routes/account';
 import categoryRoutes from './routes/category';
 import transactionRoutes from './routes/transaction';
 import weatherRoutes from './routes/weather';
-import monoRoutes from './routes/monoRoutes';
+import monoRoutes from './routes/monobank';
 import statisticsRoutes from './routes/statistic';
+import wishlistRoutes from './routes/wishlist';
 
 import { authMiddleware } from './middlewares/authMiddleware';
 import { AppError } from "./class/AppError";
@@ -76,6 +77,7 @@ app.use('/api/finance/account', accountRoutes);
 app.use('/api/finance/category', categoryRoutes);
 app.use('/api/finance/transaction', transactionRoutes);
 app.use('/api/statistics', statisticsRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 app.get(/^(?!\/api).+/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
