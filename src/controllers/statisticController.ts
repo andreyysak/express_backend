@@ -39,16 +39,30 @@ export const getTripStatistics = async (req: Request, res: Response) => {
 
         const trips = await prisma.trip.findMany({
             where: { created_at: { gte: startDate, lte: endDate } },
-            orderBy: { created_at: 'desc' }
+            orderBy: { created_at: 'asc' } // Сортуємо від старого до нового
         });
 
-        const totalKm = trips.reduce((sum, t) => sum + t.kilometrs, 0);
-        const directionStats = trips.reduce((acc: any, t) => {
-            acc[t.direction] = (acc[t.direction] || 0) + t.kilometrs;
-            return acc;
-        }, {});
+        if (trips.length === 0) {
+            return res.json({ totalKilometrs: 0, tripsCount: 0, directionStats: {}, history: [] });
+        }
 
-        res.json({ totalKilometrs: totalKm, tripsCount: trips.length, directionStats, history: trips });
+        const firstOdometer = trips[0].kilometrs;
+        const lastOdometer = trips[trips.length - 1].kilometrs;
+        const totalKm = lastOdometer - firstOdometer;
+
+        const directionStats: { [key: string]: number } = {};
+        for (let i = 1; i < trips.length; i++) {
+            const delta = trips[i].kilometrs - trips[i - 1].kilometrs;
+            const dir = trips[i].direction;
+            directionStats[dir] = (directionStats[dir] || 0) + delta;
+        }
+
+        res.json({
+            totalKilometrs: totalKm,
+            tripsCount: trips.length,
+            directionStats,
+            history: trips.reverse()
+        });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
