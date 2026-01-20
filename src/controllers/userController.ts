@@ -4,13 +4,20 @@ import { catchAsync } from '../utils/catchAsync';
 import { AppError } from '../class/AppError';
 
 export const getMe = catchAsync(async (req: Request, res: Response) => {
-  const userId = Number((req as any).user.userId);
+  const userId = (req as any).user?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID not found in token' });
+  }
+
   const user = await prisma.user.findUnique({
-    where: { user_id: userId }
+    where: {
+      user_id: Number(userId)
+    }
   });
 
   if (!user) {
-    throw new AppError('Користувача не знайдено', 404);
+    return res.status(404).json({ error: 'User not found' });
   }
 
   res.json(user);

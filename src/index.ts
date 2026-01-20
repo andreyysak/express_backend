@@ -32,11 +32,26 @@ import {initCronJobs} from "./services/cronService";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : [];
+
 app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(compression());
-app.use(cors());
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
 const limiter = rateLimit({
@@ -61,7 +76,6 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/mono', monoRoutes);
-
 app.use('/api/auth', authRoutes);
 app.use('/api/notion', notionRoutes);
 app.use('/api/weather', weatherRoutes);
@@ -85,7 +99,7 @@ app.all(/.*s*/, (req, res, next) => {
 
 app.use(globalErrorHandler);
 
-initCronJobs()
+initCronJobs();
 
 app.listen(PORT, () => {
   logger.info(`Server started on port ${PORT}`);
