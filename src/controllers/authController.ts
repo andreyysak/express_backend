@@ -6,14 +6,14 @@ export const googleAuthCallback = (req: Request, res: Response) => {
   const state = req.query.state as string;
 
   const token = jwt.sign(
-      { userId: user.user_id, email: user.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: '12h' }
+    { userId: user.user_id, email: user.email },
+    process.env.JWT_SECRET!,
+    { expiresIn: '12h' }
   );
 
-  let targetUrl = state || process.env.DEFAULT_FRONTEND_URL || 'http://localhost:5181';
+  let targetUrl = state || process.env.DEFAULT_FRONTEND_URL;
 
-  if (targetUrl.endsWith('/')) {
+  if (targetUrl && targetUrl.endsWith('/')) {
     targetUrl = targetUrl.slice(0, -1);
   }
 
