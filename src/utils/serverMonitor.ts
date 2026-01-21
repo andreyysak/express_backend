@@ -1,4 +1,5 @@
 import si from 'systeminformation';
+import pm2 from 'pm2';
 import { sendTelegramMessage } from '../services/telegramService';
 import logger from '../logger';
 
@@ -32,10 +33,45 @@ export const checkServerResources = async (isManualReport = false) => {
             await sendTelegramMessage(message);
         }
 
-        if (isManualReport) {
-            logger.info('Ручний звіт про ресурси сервера надіслано');
-        }
+        if (isManualReport) logger.info('Звіт про ресурси сервера надіслано');
     } catch (error: any) {
         logger.error(`Помилка моніторингу ресурсів: ${error.message}`);
     }
+};
+
+export const checkPm2Processes = async () => {
+    pm2.connect((err) => {
+        if (err) {
+            logger.error(`PM2 Connect Error: ${err.message}`);
+            return;
+        }
+
+        pm2.list(async (err, list) => {
+            if (err) {
+                logger.error(`PM2 List Error: ${err.message}`);
+                pm2.disconnect();
+                return;
+            }
+
+            const downProcesses = list.filter(p => p.pm2_env?.status !== 'online');
+
+            if (downProcesses.length > 0) {
+                const names = downProcesses.map(p => `❌ **${p.name}** [${p.pm2_env?.status}]`).join('\n');
+                const message = `🚨 **Увага! Впав процес PM2!**\n\n${names}\n\n♻️ Спробую автоматично перезапустити...`;
+
+                await sendTelegramMessage(message);
+
+                downProcesses.forEach(p => {
+                    if (p.name) {
+                        pm2.restart(p.name, (err) => {
+                            if (err) logger.error(`Не вдалося перезапустити ${p.name}: ${err.message}`);
+                            else logger.info(`Процес ${p.name} успішно перезапущено монітором`);
+                        });
+                    }
+                });
+            }
+
+            pm2.disconnect();
+        });
+    });
 };
