@@ -1,36 +1,19 @@
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 
 export const parseWog = async () => {
     try {
-        const { data } = await axios.get('https://wog.ua/ua/fuels/', {
+        const { data } = await axios.get('https://api.wog.ua/fuel_types', {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             }
         });
 
-        const $ = cheerio.load(data);
-        const prices: { fuelType: string; price: number }[] = [];
+        const fuelItems = data.data || data;
 
-        // Шукаємо контейнери карток пального
-        $('.s_fuel_item__2qQ_C').each((_, element) => {
-            const $el = $(element);
-
-            // Витягуємо тип (95, ДП, ГАЗ) та бренд (Mustang, Євро5)
-            const type = $el.find('.s_type__1QSuj').text().trim();
-            const brand = $el.find('.s_brand__oFHv0').text().trim();
-
-            // Витягуємо ціну
-            const priceText = $el.find('.s_price__W9J5t').text().trim();
-
-            if (type && priceText) {
-                const fullName = brand ? `${type} ${brand}` : type;
-                prices.push({
-                    fuelType: mapWogFuelName(fullName),
-                    price: parseFloat(priceText.replace(',', '.'))
-                });
-            }
-        });
+        const prices: { fuelType: string; price: number }[] = fuelItems.map((item: any) => ({
+            fuelType: mapWogFuelName(item.name),
+            price: parseFloat(item.price)
+        })).filter((p: any) => p.price > 0);
 
         return {
             station: 'WOG',
