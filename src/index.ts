@@ -29,7 +29,7 @@ import { authMiddleware } from './middlewares/authMiddleware';
 import { AppError } from "./class/AppError";
 import { globalErrorHandler } from "./middlewares/errorMiddleware";
 import {initCronJobs} from "./services/cronService";
-import {checkServerResources} from "./utils/serverMonitor";
+import {checkPm2Processes, checkServerResources} from "./utils/serverMonitor";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -105,6 +105,7 @@ app.use(globalErrorHandler);
 initCronJobs();
 
 checkServerResources(true)
+checkPm2Processes()
 
 app.listen(PORT, () => {
   logger.info(`Server started on port ${PORT}`);
