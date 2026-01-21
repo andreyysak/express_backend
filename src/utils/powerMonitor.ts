@@ -8,9 +8,12 @@ export const handlePowerStatusChange = async (name: string, currentStatus: 'onli
     const previousStatus = powerStatusMap.get(name);
 
     if (previousStatus !== undefined && previousStatus !== currentStatus) {
-        const icon = currentStatus === 'online' ? '✅' : '❌';
-        const action = currentStatus === 'online' ? 'відновлено' : 'відсутнє';
-        const message = `${icon} **${name}**\nЕлектропостачання ${action}`;
+        const icon = currentStatus === 'online' ? '💡' : '🔌';
+        const action = currentStatus === 'online' ? 'З’ЯВИЛОСЯ' : 'ЗНИКЛО';
+        const statusText = currentStatus === 'online' ? 'Напруга відновлена' : 'Мережа знеструмлена';
+        const decoration = currentStatus === 'online' ? '⚡️' : '🌑';
+
+        const message = `${icon} **${name}**\n${decoration} Електропостачання ${action}\nℹ️ ${statusText}`;
 
         await sendTelegramMessage(message);
         logger.info(`Power status changed for ${name}: ${currentStatus}`);
