@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { prisma } from "../db";
 import { sendDashboardToTelegram, sendTelegramMessage } from './telegramService';
 import { runAllParsers } from '../parsers';
-import { getStatements } from './monoService';
+import {getMonoUserInfo, getStatements} from './monoService';
 import { getCategoryByMcc } from '../utils/mccMapper';
 import { fetchWeatherReport, generateWeeklyReportData } from '../utils/reportHelpers';
 import logger from '../logger';
@@ -64,6 +64,16 @@ export const initCronJobs = () => {
 
     cron.schedule('5 * * * *', async () => {
         try {
+            console.log('🔄 Запуск синхронізації Monobank за розкладом...');
+
+            const monoData = await getMonoUserInfo();
+            for (const accData of monoData.accounts) {
+                await prisma.account.updateMany({
+                    where: { mono_account_id: accData.id },
+                    data: { balance: accData.balance / 100 }
+                });
+            }
+
             const accounts = await prisma.account.findMany({
                 where: { mono_account_id: { not: null } }
             });
@@ -72,13 +82,15 @@ export const initCronJobs = () => {
                 const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
                 const transactions = await getStatements(acc.mono_account_id!, oneDayAgo);
 
+                if (!Array.isArray(transactions)) continue;
+
                 for (const tx of transactions) {
                     const amount = tx.amount / 100;
                     const txDate = new Date(tx.time * 1000);
 
                     const exists = await prisma.transaction.findFirst({
                         where: {
-                            user_id: acc.user_id,
+                            account_id: acc.account_id,
                             amount,
                             date: txDate,
                             description: tx.description
@@ -101,30 +113,25 @@ export const initCronJobs = () => {
                             });
                         }
 
-                        await prisma.$transaction([
-                            prisma.transaction.create({
-                                data: {
-                                    user_id: acc.user_id,
-                                    account_id: acc.account_id,
-                                    category_id: category.category_id,
-                                    amount,
-                                    description: tx.description,
-                                    date: txDate
-                                }
-                            }),
-                            prisma.account.update({
-                                where: { account_id: acc.account_id },
-                                data: { balance: { increment: amount } }
-                            })
-                        ]);
+                        await prisma.transaction.create({
+                            data: {
+                                user_id: acc.user_id,
+                                account_id: acc.account_id,
+                                category_id: category.category_id,
+                                amount,
+                                description: tx.description,
+                                date: txDate
+                            }
+                        });
 
                         const emoji = amount < 0 ? '💸' : '💰';
                         await sendTelegramMessage(`${emoji} **${acc.name}**: \`${amount.toFixed(2)} ${acc.currency}\`\n📝 \`${tx.description}\``);
                     }
                 }
             }
-        } catch (error) {
-            logger.error('Mono Cron Error');
+            console.log('✅ Синхронізація Monobank завершена.');
+        } catch (error: any) {
+            logger.error(`❌ Mono Cron Error: ${error.message}`);
         }
     });
 
