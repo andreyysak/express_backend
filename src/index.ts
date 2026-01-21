@@ -93,7 +93,7 @@ app.use('/api/finance/transaction', transactionRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 
-app.all(/.*s*/, (req, res, next) => {
+app.get(/^(?!\/api).+/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 

@@ -4,3 +4,4 @@ src/generated
 src/db.ts
 prisma.config.ts
 src/db.ts
+dist/
