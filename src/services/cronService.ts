@@ -10,6 +10,8 @@ import { formatPowerMessage, getPowerShutdownInfo, hasPowerChanged } from "../pa
 import { sendPowerPhoto } from "../utils/powerOutage";
 import { checkAsusPowerMonitors } from '../utils/powerMonitor';
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 export const initCronJobs = () => {
     setInterval(async () => {
         const startTime = new Date().toLocaleTimeString();
@@ -73,6 +75,9 @@ export const initCronJobs = () => {
                     data: { balance: accData.balance / 100 }
                 });
             }
+            console.log('✅ Баланси оновлено. Чекаємо 65 секунд для лімітів API...');
+
+            await delay(65000);
 
             const accounts = await prisma.account.findMany({
                 where: { mono_account_id: { not: null } }
@@ -80,56 +85,70 @@ export const initCronJobs = () => {
 
             for (const acc of accounts) {
                 const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
-                const transactions = await getStatements(acc.mono_account_id!, oneDayAgo);
 
-                if (!Array.isArray(transactions)) continue;
+                try {
+                    const transactions = await getStatements(acc.mono_account_id!, oneDayAgo);
 
-                for (const tx of transactions) {
-                    const amount = tx.amount / 100;
-                    const txDate = new Date(tx.time * 1000);
+                    if (Array.isArray(transactions)) {
+                        for (const tx of transactions) {
+                            const amount = tx.amount / 100;
+                            const txDate = new Date(tx.time * 1000);
 
-                    const exists = await prisma.transaction.findFirst({
-                        where: {
-                            account_id: acc.account_id,
-                            amount,
-                            date: txDate,
-                            description: tx.description
-                        }
-                    });
-
-                    if (!exists) {
-                        const categoryName = getCategoryByMcc(tx.mcc);
-                        let category = await prisma.category.findFirst({
-                            where: { user_id: acc.user_id, name: categoryName }
-                        });
-
-                        if (!category) {
-                            category = await prisma.category.create({
-                                data: {
-                                    user_id: acc.user_id,
-                                    name: categoryName,
-                                    type: amount < 0 ? 'EXPENSE' : 'INCOME'
+                            const exists = await prisma.transaction.findFirst({
+                                where: {
+                                    account_id: acc.account_id,
+                                    amount,
+                                    date: txDate,
+                                    description: tx.description
                                 }
                             });
-                        }
 
-                        await prisma.transaction.create({
-                            data: {
-                                user_id: acc.user_id,
-                                account_id: acc.account_id,
-                                category_id: category.category_id,
-                                amount,
-                                description: tx.description,
-                                date: txDate
+                            if (!exists) {
+                                const categoryName = getCategoryByMcc(tx.mcc);
+                                let category = await prisma.category.findFirst({
+                                    where: { user_id: acc.user_id, name: categoryName }
+                                });
+
+                                if (!category) {
+                                    category = await prisma.category.create({
+                                        data: {
+                                            user_id: acc.user_id,
+                                            name: categoryName,
+                                            type: amount < 0 ? 'EXPENSE' : 'INCOME'
+                                        }
+                                    });
+                                }
+
+                                await prisma.transaction.create({
+                                    data: {
+                                        user_id: acc.user_id,
+                                        account_id: acc.account_id,
+                                        category_id: category.category_id,
+                                        amount,
+                                        description: tx.description,
+                                        date: txDate
+                                    }
+                                });
+
+                                const emoji = amount < 0 ? '💸' : '💰';
+                                await sendTelegramMessage(`${emoji} **${acc.name}**: \`${amount.toFixed(2)} ${acc.currency}\`\n📝 \`${tx.description}\``);
                             }
-                        });
+                        }
+                    }
 
-                        const emoji = amount < 0 ? '💸' : '💰';
-                        await sendTelegramMessage(`${emoji} **${acc.name}**: \`${amount.toFixed(2)} ${acc.currency}\`\n📝 \`${tx.description}\``);
+                    if (accounts.length > 1) {
+                        await delay(61000);
+                    }
+
+                } catch (err: any) {
+                    if (err.message.includes('429')) {
+                        console.error(`⚠️ Пропущено рахунок ${acc.name} через ліміт запитів.`);
+                    } else {
+                        throw err;
                     }
                 }
             }
-            console.log('✅ Синхронізація Monobank завершена.');
+            console.log('✅ Синхронізація транзакцій Monobank завершена.');
         } catch (error: any) {
             logger.error(`❌ Mono Cron Error: ${error.message}`);
         }
