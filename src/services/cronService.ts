@@ -9,6 +9,7 @@ import logger from '../logger';
 import { formatPowerMessage, getPowerShutdownInfo, hasPowerChanged } from "../parsers/power_outage_schedule";
 import { sendPowerPhoto } from "../utils/powerOutage";
 import { checkAsusPowerMonitors } from '../utils/powerMonitor';
+import {checkServerResources} from "../utils/serverMonitor";
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -187,5 +188,9 @@ export const initCronJobs = () => {
         } catch (error) {
             logger.error('Power Outage Schedule Cron Error');
         }
+    });
+
+    cron.schedule('0 * * * *', async () => {
+        await checkServerResources();
     });
 };
