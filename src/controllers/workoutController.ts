@@ -36,18 +36,32 @@ export const createWorkout = async (req: Request, res: Response) => {
 
 export const getUserWorkouts = async (req: Request, res: Response) => {
     try {
-        const { userId } = req.params;
+        // Беремо userId з токена, як і в контролері вправ
+        const userIdFromToken = (req.user as any)?.userId;
+
+        if (!userIdFromToken) {
+            return res.status(401).json({ error: "Неавторизований: ID користувача не знайдено" });
+        }
+
         const workouts = await prisma.workout.findMany({
-            where: { user_id: Number(userId) },
+            where: { 
+                user_id: Number(userIdFromToken) // Гарантуємо, що це число (Int)
+            },
             include: {
                 sets: {
-                    include: { exercise: true }
+                    include: { 
+                        exercise: true 
+                    }
                 }
             },
-            orderBy: { date: 'desc' }
+            orderBy: { 
+                date: 'desc' 
+            }
         });
+
         res.json(workouts);
     } catch (error: any) {
+        logger.error(`Помилка отримання тренувань: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 };
