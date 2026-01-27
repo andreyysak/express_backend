@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import logger from '../logger';
-
-const prisma = new PrismaClient();
+import { prisma } from '../db';
 
 export const createWorkout = async (req: Request, res: Response) => {
     try {
