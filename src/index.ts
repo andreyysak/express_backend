@@ -24,6 +24,7 @@ import monoRoutes from './routes/monobank';
 import statisticsRoutes from './routes/statistic';
 import wishlistRoutes from './routes/wishlist';
 import abusedbRoutes from './routes/abusedb';
+import workoutRoutes from './routes/workout';
 
 import { authMiddleware } from './middlewares/authMiddleware';
 import { AppError } from "./class/AppError";
@@ -95,6 +96,7 @@ app.use('/api/finance/transaction', transactionRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/abusedb', abusedbRoutes);
+app.use('/api/workout', workoutRoutes);
 
 app.get(/^(?!\/api).+/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
