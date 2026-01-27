@@ -17,14 +17,30 @@ export const getExercises = async (req: Request, res: Response) => {
 
 export const createExercise = async (req: Request, res: Response) => {
     try {
-        const { user_id, name, category, equipment } = req.body;
+        const { name, category, equipment } = req.body;
+        
+        const userId = (req.user as any)?.userId;
+
+        if (!userId) {
+            return res.status(401).json({ 
+                error: "Неавторизований: ID користувача не знайдено в токені",
+                received_payload: req.user
+            });
+        }
+
         const exercise = await prisma.exercise.create({
-            data: { user_id, name, category, equipment }
+            data: {
+                user_id: Number(userId),
+                name: name,
+                category: category || 'Силові',
+                equipment: equipment || 'Немає'
+            }
         });
+
         res.status(201).json(exercise);
     } catch (error: any) {
-        logger.error(`Помилка створення вправи: ${error.message}`);
-        res.status(500).json({ error: 'Failed to create exercise' });
+        logger.error(`Помилка Prisma: ${error.message}`);
+        res.status(500).json({ error: error.message });
     }
 };
 
