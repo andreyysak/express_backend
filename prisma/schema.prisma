@@ -24,6 +24,8 @@ model User {
   transactions      Transaction[]
   trips             Trip[]
   wishList          WishList[]
+  workouts          Workout[]
+  exercises         Exercise[]
 }
 
 model Fuel {
@@ -43,7 +45,7 @@ model Maintenance {
   maintenance_id Int      @id @default(autoincrement())
   user_id        Int
   date           DateTime
-  description    String   @db.Text
+  description    String
   odometer       Int
   created_at     DateTime @default(now())
   updated_at     DateTime @default(now()) @updatedAt
@@ -56,7 +58,7 @@ model Trip {
   trip_id          Int      @id @default(autoincrement())
   telegram_user_id String
   kilometrs        Float
-  direction        String   @db.Text
+  direction        String
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
   user             User     @relation(fields: [telegram_user_id], references: [telegram_user_id], onDelete: Cascade)
@@ -66,12 +68,12 @@ model Trip {
 
 model Account {
   account_id      Int           @id @default(autoincrement())
-  mono_account_id String?       @unique
   user_id         Int
   name            String
   currency        String        @default("UAH")
   balance         Float         @default(0)
   created_at      DateTime      @default(now())
+  mono_account_id String?       @unique
   user            User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   transactions    Transaction[]
 
@@ -95,7 +97,7 @@ model Transaction {
   account_id     Int
   category_id    Int
   amount         Float
-  description    String?  @db.Text
+  description    String?
   date           DateTime @default(now())
   account        Account  @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
   category       Category @relation(fields: [category_id], references: [category_id], onDelete: Cascade)
@@ -136,6 +138,38 @@ model WishList {
   image_url  String?
   category   String   @default("General")
   created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
 
-  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+model Workout {
+  workout_id Int      @id @default(autoincrement())
+  user_id    Int
+  name       String?
+  date       DateTime @default(now())
+  notes      String?  @db.Text
+  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  sets       Set[]
+}
+
+model Exercise {
+  exercise_id Int     @id @default(autoincrement())
+  user_id     Int
+  name        String
+  category    String
+  equipment   String?
+  user        User    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  sets        Set[]
+}
+
+model Set {
+  set_id      Int      @id @default(autoincrement())
+  workout_id  Int
+  exercise_id Int
+  weight      Float?
+  reps        Int?
+  duration    Int?
+  distance    Float?
+  created_at  DateTime @default(now())
+  workout     Workout  @relation(fields: [workout_id], references: [workout_id], onDelete: Cascade)
+  exercise    Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
 }
