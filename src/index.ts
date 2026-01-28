@@ -23,9 +23,11 @@ import weatherRoutes from './routes/weather';
 import monoRoutes from './routes/monobank';
 import statisticsRoutes from './routes/statistic';
 import wishlistRoutes from './routes/wishlist';
-import abusedbRoutes from './routes/abusedb';
+import abusedRoutes from './routes/abusedb';
 import workoutRoutes from './routes/workout';
-import exerciesRoutes from './routes/exercise';
+import exercisesRoutes from './routes/exercise';
+import plannedWorkoutRoutes from './routes/plannedWorkout';
+
 
 import { authMiddleware } from './middlewares/authMiddleware';
 import { AppError } from "./class/AppError";
@@ -96,9 +98,11 @@ app.use('/api/finance/category', categoryRoutes);
 app.use('/api/finance/transaction', transactionRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/wishlist', wishlistRoutes);
-app.use('/api/abusedb', abusedbRoutes);
+app.use('/api/abusedb', abusedRoutes);
+
 app.use('/api/workout', workoutRoutes);
-app.use('/api/exercise', exerciesRoutes);
+app.use('/api/exercise', exercisesRoutes);
+app.use('/api/planned-workouts', plannedWorkoutRoutes);
 
 app.get(/^(?!\/api).+/, (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
