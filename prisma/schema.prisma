@@ -7,16 +7,16 @@ datasource db {
 }
 
 model User {
-  user_id           Int           @id @default(autoincrement())
-  email             String?       @unique
-  phone             String?       @unique
+  user_id           Int              @id @default(autoincrement())
+  email             String?          @unique
+  phone             String?          @unique
   telegram_name     String?
   telegram_username String?
-  telegram_user_id  String        @unique
+  telegram_user_id  String           @unique
   country           String?
   city              String?
   image             String?
-  created_at        DateTime      @default(now())
+  created_at        DateTime         @default(now())
   accounts          Account[]
   categories        Category[]
   fuels             Fuel[]
@@ -26,6 +26,7 @@ model User {
   wishList          WishList[]
   workouts          Workout[]
   exercises         Exercise[]
+  plannedWorkouts   PlannedWorkout[]
 }
 
 model Fuel {
@@ -172,4 +173,23 @@ model Set {
   created_at  DateTime @default(now())
   workout     Workout  @relation(fields: [workout_id], references: [workout_id], onDelete: Cascade)
   exercise    Exercise @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade)
+}
+
+model PlannedWorkout {
+  planned_workout_id Int  @id @default(autoincrement())
+  user_id            Int
+  user               User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  title        String
+  scheduled_at DateTime
+  status       String   @default("pending")
+  notes        String?  @db.Text
+
+  exercises Json
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([scheduled_at])
 }
